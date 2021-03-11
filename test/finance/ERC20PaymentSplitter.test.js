@@ -75,7 +75,9 @@ contract('ERC20PaymentSplitter', function (accounts) {
     });
 
     it('rejects payments', async function () {
-      await expectRevert.unspecified(send.ether(owner, this.contract.address, amount));
+      await expectRevert(send.ether(owner, this.contract.address, amount),
+        'ERC20PaymentSplitter: ether not supported',
+      );
     });
 
     describe('shares', async function () {

@@ -7,18 +7,18 @@ import "../utils/Address.sol";
 
 /**
  * @title PaymentSplitter
- * @dev This contract allows to split assets payments among a group of accounts. The sender does not need to be aware
- * that the underlyint asset will be split in this way, since it is handled transparently by the contract.
+ * @dev This contract allows to split Ether payments among a group of accounts. The sender does not need to be aware
+ * that the Ether will be split in this way, since it is handled transparently by the contract.
  *
  * The split can be in equal parts or in any other arbitrary proportion. The way this is specified is by assigning each
- * account to a number of shares. Of all the value that this contract receives, each account will then be able to claim
+ * account to a number of shares. Of all the Ether that this contract receives, each account will then be able to claim
  * an amount proportional to the percentage of total shares they were assigned.
  *
  * `PaymentSplitter` follows a _pull payment_ model. This means that payments are not automatically forwarded to the
  * accounts but kept in this contract, and the actual transfer is triggered as a separate step by calling the {release}
  * function.
  */
-abstract contract PaymentSplitter is Context {
+contract PaymentSplitter is Context {
     event PayeeAdded(address account, uint256 shares);
     event PaymentReleased(address to, uint256 amount);
     event PaymentReceived(address from, uint256 amount);
@@ -37,7 +37,7 @@ abstract contract PaymentSplitter is Context {
      * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
      * duplicates in `payees`.
      */
-    constructor (address[] memory payees_, uint256[] memory shares_) {
+    constructor (address[] memory payees_, uint256[] memory shares_) payable {
         // solhint-disable-next-line max-line-length
         require(payees_.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
         require(payees_.length > 0, "PaymentSplitter: no payees");
@@ -45,6 +45,19 @@ abstract contract PaymentSplitter is Context {
         for (uint256 i = 0; i < payees_.length; ++i) {
             _addPayee(payees_[i], shares_[i], 0);
         }
+    }
+
+    /**
+     * @dev The Ether received will be logged with {PaymentReceived} events. Note that these events are not fully
+     * reliable: it's possible for a contract to receive Ether without triggering this function. This only affects the
+     * reliability of the events, and not the actual splitting of Ether.
+     *
+     * To learn more about this see the Solidity documentation for
+     * https://solidity.readthedocs.io/en/latest/contracts.html#fallback-function[fallback
+     * functions].
+     */
+    receive () external payable virtual {
+        emit PaymentReceived(_msgSender(), msg.value);
     }
 
     /**
@@ -136,10 +149,14 @@ abstract contract PaymentSplitter is Context {
     /**
      * @dev abstract virtual function: returns the current balance of the PaymentSplitter
      */
-    function _currentBalance() internal view virtual returns (uint256);
+    function _currentBalance() internal view virtual returns (uint256) {
+        return address(this).balance;
+    }
 
     /**
      * @dev abstract virtual function: send value/assets
      */
-    function _processPayment(address payable account, uint256 payment) internal virtual;
+    function _processPayment(address payable account, uint256 payment) internal virtual {
+        Address.sendValue(account, payment);
+    }
 }
