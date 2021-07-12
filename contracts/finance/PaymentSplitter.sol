@@ -28,7 +28,6 @@ contract PaymentSplitter is Context {
 
     mapping(address => uint256) private _shares;
     mapping(address => uint256) private _released;
-    address[] private _payees;
 
     /**
      * @dev Creates an instance of `PaymentSplitter` where each account in `payees` is assigned the number of shares at
@@ -42,7 +41,7 @@ contract PaymentSplitter is Context {
         require(payees.length > 0, "PaymentSplitter: no payees");
 
         for (uint256 i = 0; i < payees_.length; ++i) {
-            _addPayee(payees_[i], shares_[i], 0);
+            _setShares(payees_[i], shares_[i]);
         }
     }
 
@@ -88,13 +87,6 @@ contract PaymentSplitter is Context {
     }
 
     /**
-     * @dev Getter for the address of the payee number `index`.
-     */
-    function payee(uint256 index) public view returns (address) {
-        return _payees[index];
-    }
-
-    /**
      * @dev Triggers a transfer to `account` of the amount of Ether they are owed, according to their percentage of the
      * total shares and their previous withdrawals.
      */
@@ -118,31 +110,24 @@ contract PaymentSplitter is Context {
      * @param account The address of the payee to add.
      * @param shares_ The number of shares owned by the payee.
      */
-    function _addPayee(address account, uint256 shares_) internal virtual {
-        uint256 totalReceived = _currentBalance() + _totalReleased;
-        uint256 virtualrelease = _totalShares == 0 ? 0 : totalReceived * _shares[account] / _totalShares;
+    function _setShares(address account, uint256 newShares) internal virtual {
+        uint256 totalReceived  = _currentBalance() + _totalReleased;
+        uint256 oldShares      = _shares[account];
 
-        _addPayee(account, shares_, virtualrelease);
-    }
+        if (oldShares < newShares) {
+            uint256 delta       = allReceived * (newShares - oldShares) / totalShares
+            _released[account] += delta;
+            _totalReleased     += delta;
+        } else {
+            uint256 delta       = allReceived * (oldShares - newShares) / totalShares
+            _released[account] -= delta;
+            _totalReleased     -= delta;
+        }
 
-    /**
-     * @dev Add a new payee to the contract.
-     * @param account The address of the payee to add.
-     * @param shares_ The number of shares owned by the payee.
-     * @param virtualrelease The offset used to balance splitting when adding a payee after construction
-     */
-    function _addPayee(address account, uint256 shares_, uint256 virtualrelease) private {
-        require(account != address(0), "PaymentSplitter: account is the zero address");
-        require(shares_ > 0, "PaymentSplitter: shares are 0");
-        require(_shares[account] == 0, "PaymentSplitter: account already has shares");
+        _shares[account] = newShares;
+        totalShares = totalShares + newShares - oldShares;
 
-        _payees.push(account);
-        _shares[account] = shares_;
-        _totalShares += shares_;
-        _released[account] = virtualrelease;
-        _totalReleased += virtualrelease;
-
-        emit PayeeAdded(account, shares_);
+        emit PayeeAdded(account, newShares);
     }
 
     /**
