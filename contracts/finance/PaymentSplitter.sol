@@ -37,10 +37,9 @@ contract PaymentSplitter is Context {
      * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
      * duplicates in `payees`.
      */
-    constructor (address[] memory payees_, uint256[] memory shares_) payable {
-        // solhint-disable-next-line max-line-length
-        require(payees_.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
-        require(payees_.length > 0, "PaymentSplitter: no payees");
+    constructor(address[] memory payees, uint256[] memory shares_) payable {
+        require(payees.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
+        require(payees.length > 0, "PaymentSplitter: no payees");
 
         for (uint256 i = 0; i < payees_.length; ++i) {
             _addPayee(payees_[i], shares_[i], 0);
@@ -56,7 +55,7 @@ contract PaymentSplitter is Context {
      * https://solidity.readthedocs.io/en/latest/contracts.html#fallback-function[fallback
      * functions].
      */
-    receive () external payable virtual {
+    receive() external payable virtual {
         emit PaymentReceived(_msgSender(), msg.value);
     }
 
@@ -102,8 +101,8 @@ contract PaymentSplitter is Context {
     function release(address payable account) public virtual {
         require(_shares[account] > 0, "PaymentSplitter: account has no shares");
 
-        uint256 totalReceived = _currentBalance() + _totalReleased;
-        uint256 payment = totalReceived * _shares[account] / _totalShares - _released[account];
+        uint256 totalReceived = address(this).balance + _totalReleased;
+        uint256 payment = (totalReceived * _shares[account]) / _totalShares - _released[account];
 
         require(payment != 0, "PaymentSplitter: account is not due payment");
 
