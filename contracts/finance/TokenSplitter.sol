@@ -11,16 +11,18 @@ import "../token/ERC20/utils/SafeERC20.sol";
  * @dev An ERC20 specific version of the {PaymentSplitter}
  */
 contract TokenSplitter is PaymentSplitter {
-    IERC20 immutable public token;
+    IERC20 public immutable token;
 
-    constructor (IERC20 _token, address[] memory _payees, uint256[] memory _shares)
-    PaymentSplitter(_payees, _shares)
-    {
+    constructor(
+        IERC20 _token,
+        address[] memory _payees,
+        uint256[] memory _shares
+    ) PaymentSplitter(_payees, _shares) {
         require(Address.isContract(address(_token)), "TokenSplitter: token is not a contract");
         token = _token;
     }
 
-    receive () external payable virtual override {
+    receive() external payable virtual override {
         revert("TokenSplitter: ether not supported");
     }
 

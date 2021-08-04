@@ -96,11 +96,11 @@ contract('TokenSplitter', function (accounts) {
 
       // distribute to payees
       for (const [ address, shares ] of Object.entries(this.payees)) {
-        const balance = await this.token.balanceOf(address);
-        const { receipt } = await this.contract.release(address, { gasPrice: 0 });
-        const profit = (await this.token.balanceOf(address)).sub(balance);
+        const before = await this.token.balanceOf(address);
+        const { receipt } = await this.contract.release(address);
+        const profit = (await this.token.balanceOf(address)).sub(before);
 
-        expect(profit).to.be.bignumber.equal(ether('1').mul(shares).div(this.totalShares));
+        expect(profit).to.be.bignumber.equal(amount.mul(shares).div(this.totalShares));
         expectEvent(receipt, 'PaymentReleased', {
           to: address,
           amount: profit,

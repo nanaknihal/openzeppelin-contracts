@@ -11,11 +11,11 @@ import "../../token/ERC20/extensions/ERC20Wrapper.sol";
  * share of staked tokens of users (in the same token).
  */
 contract PaymentSplitterShares is ERC20Wrapper, TokenSplitter {
-    constructor(string memory name, string memory symbol, IERC20 token)
-        ERC20(name, symbol)
-        ERC20Wrapper(token)
-        TokenSplitter(token, new address[](0), new uint256[](0))
-    {}
+    constructor(
+        string memory name,
+        string memory symbol,
+        IERC20 token
+    ) ERC20(name, symbol) ERC20Wrapper(token) TokenSplitter(token, new address[](0), new uint256[](0)) {}
 
     function _afterTokenTransfer(
         address from,

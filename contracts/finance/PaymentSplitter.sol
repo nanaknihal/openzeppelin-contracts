@@ -5,42 +5,47 @@ pragma solidity ^0.8.0;
 import "../utils/Context.sol";
 import "../utils/Address.sol";
 
-
-
 library Distributions {
-    struct Distribution {
+    struct AddressToUintWithTotal {
         mapping(address => uint256) _values;
         uint256 _total;
     }
 
-    function getValue(Distribution storage distribution, address account) internal view returns (uint256) {
+    function getValue(AddressToUintWithTotal storage distribution, address account) internal view returns (uint256) {
         return distribution._values[account];
     }
 
-    function getTotal(Distribution storage distribution) internal view returns (uint256) {
+    function getTotal(AddressToUintWithTotal storage distribution) internal view returns (uint256) {
         return distribution._total;
     }
 
-    function increaseValue(Distribution storage distribution, address account, uint256 value) internal {
+    function increaseValue(
+        AddressToUintWithTotal storage distribution,
+        address account,
+        uint256 value
+    ) internal {
         distribution._total += value;
         distribution._values[account] += value;
     }
 
-    function decreaseValue(Distribution storage distribution, address account, uint256 value) internal {
+    function decreaseValue(
+        AddressToUintWithTotal storage distribution,
+        address account,
+        uint256 value
+    ) internal {
         distribution._total -= value;
         distribution._values[account] -= value;
     }
 
-    function setValue(Distribution storage distribution, address account, uint256 value) internal {
-        uint256 total = getTotal(distribution);
-        total -= getValue(distribution, account);
-        total += value;
-        distribution._total = total;
+    function setValue(
+        AddressToUintWithTotal storage distribution,
+        address account,
+        uint256 value
+    ) internal {
+        distribution._total = getTotal(distribution) - getValue(distribution, account) + value;
         distribution._values[account] = value;
     }
 }
-
-
 
 /**
  * @title PaymentSplitter
@@ -56,10 +61,12 @@ library Distributions {
  * function.
  */
 contract PaymentSplitter is Context {
-    using Distributions for Distributions.Distribution;
+    using Distributions for Distributions.AddressToUintWithTotal;
 
-    Distributions.Distribution private $shares;
-    Distributions.Distribution private $released;
+    // solhint-disable-next-line var-name-mixedcase, private-vars-leading-underscore
+    Distributions.AddressToUintWithTotal private $shares;
+    // solhint-disable-next-line var-name-mixedcase, private-vars-leading-underscore
+    Distributions.AddressToUintWithTotal private $released;
 
     event PayeeAdded(address account, uint256 shares);
     event PaymentReleased(address to, uint256 amount);
@@ -129,7 +136,7 @@ contract PaymentSplitter is Context {
     function release(address payable account) public virtual {
         uint256 totalReceived = _currentBalance() + totalReleased();
         uint256 personalValue = (totalReceived * shares(account)) / totalShares();
-        uint256 pendingValue  = personalValue - released(account);
+        uint256 pendingValue = personalValue - released(account);
 
         if (pendingValue > 0) {
             $released.increaseValue(account, pendingValue);
@@ -149,10 +156,10 @@ contract PaymentSplitter is Context {
         if (totalReceived > 0) {
             uint256 oldShares = shares(account);
             if (oldShares < newShares) {
-                uint256 delta = totalReceived * (newShares - oldShares) / totalShares();
+                uint256 delta = (totalReceived * (newShares - oldShares)) / totalShares();
                 $released.increaseValue(account, delta);
             } else {
-                uint256 delta = totalReceived * (oldShares - newShares) / totalShares();
+                uint256 delta = (totalReceived * (oldShares - newShares)) / totalShares();
                 $released.decreaseValue(account, delta);
             }
         }
