@@ -7,20 +7,21 @@ import "../utils/Address.sol";
 import "../token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title ERC20PaymentSplitter
+ * @title TokenSplitter
  * @dev An ERC20 specific version of the {PaymentSplitter}
-
  */
-contract ERC20PaymentSplitter is PaymentSplitter {
+contract TokenSplitter is PaymentSplitter {
     IERC20 immutable public token;
 
-    constructor (address token_, address[] memory payees_, uint256[] memory shares_) PaymentSplitter(payees_, shares_) {
-        require(Address.isContract(token_), "ERC20PaymentSplitter: token is not a contract");
-        token = IERC20(token_);
+    constructor (IERC20 _token, address[] memory _payees, uint256[] memory _shares)
+    PaymentSplitter(_payees, _shares)
+    {
+        require(Address.isContract(address(_token)), "TokenSplitter: token is not a contract");
+        token = _token;
     }
 
     receive () external payable virtual override {
-        revert("ERC20PaymentSplitter: ether not supported");
+        revert("TokenSplitter: ether not supported");
     }
 
     function _currentBalance() internal view virtual override returns (uint256) {
