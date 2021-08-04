@@ -1,4 +1,5 @@
-const { BN, balance, ether, expectEvent, send, expectRevert } = require('@openzeppelin/test-helpers');
+const { balance, constants, ether, expectEvent, send, expectRevert } = require('@openzeppelin/test-helpers');
+const { ZERO_ADDRESS } = constants;
 
 const { expect } = require('chai');
 
@@ -25,30 +26,40 @@ contract('PaymentSplitter', function (accounts) {
     );
   });
 
+  it('rejects null payees', async function () {
+    await expectRevert(PaymentSplitter.new([payee1, ZERO_ADDRESS], [20, 30]),
+      'PaymentSplitter: account is the zero address',
+    );
+  });
+
+  it('rejects zero-valued shares', async function () {
+    await expectRevert(PaymentSplitter.new([payee1, payee2], [20, 0]),
+      'PaymentSplitter: shares are 0',
+    );
+  });
+
+  it('rejects repeated payees', async function () {
+    await expectRevert(PaymentSplitter.new([payee1, payee1], [20, 30]),
+      'PaymentSplitter: account already has shares',
+    );
+  });
+
   context('once deployed', function () {
     beforeEach(async function () {
-      this.payees = {
-        [payee1]: new BN(20),
-        [payee2]: new BN(10),
-        [payee3]: new BN(70),
-      };
+      this.payees = [payee1, payee2, payee3];
+      this.shares = [20, 10, 70];
 
-      this.totalShares = Object.values(this.payees).reduce((a, b) => a.add(b), new BN(0));
-
-      this.contract = await PaymentSplitter.new(
-        Object.keys(this.payees),
-        Object.values(this.payees),
-      );
+      this.contract = await PaymentSplitter.new(this.payees, this.shares);
     });
 
     it('has total shares', async function () {
-      expect(await this.contract.totalShares()).to.be.bignumber.equal(this.totalShares);
+      expect(await this.contract.totalShares()).to.be.bignumber.equal('100');
     });
 
     it('has payees', async function () {
-      await Promise.all(Object.entries(this.payees).map(async ([ address, shares ]) => {
-        expect(await this.contract.shares(address)).to.be.bignumber.equal(shares);
-        expect(await this.contract.released(address)).to.be.bignumber.equal('0');
+      await Promise.all(this.payees.map(async (payee, index) => {
+        expect(await this.contract.payee(index)).to.equal(payee);
+        expect(await this.contract.released(payee)).to.be.bignumber.equal('0');
       }));
     });
 
@@ -63,15 +74,22 @@ contract('PaymentSplitter', function (accounts) {
         expect(await this.contract.shares(payee1)).to.be.bignumber.not.equal('0');
       });
 
-      it('empty shares if address is not payee', async function () {
+      it('does not store shares if address is not payee', async function () {
         expect(await this.contract.shares(nonpayee1)).to.be.bignumber.equal('0');
       });
     });
 
     describe('release', async function () {
-      it('no funds to claim', async function () {
-        const { logs } = await this.contract.release(nonpayee1);
-        expect(logs).to.be.deep.equal([]);
+      it('reverts if no funds to claim', async function () {
+        await expectRevert(this.contract.release(payee1),
+          'PaymentSplitter: account is not due payment',
+        );
+      });
+      it('reverts if non-payee want to claim', async function () {
+        await send.ether(payer1, this.contract.address, amount);
+        await expectRevert(this.contract.release(nonpayee1),
+          'PaymentSplitter: account has no shares',
+        );
       });
     });
 
@@ -83,13 +101,16 @@ contract('PaymentSplitter', function (accounts) {
       expect(initBalance).to.be.bignumber.equal(amount);
 
       // distribute to payees
-      for (const [ address, shares ] of Object.entries(this.payees)) {
-        const before = await balance.current(address);
-        const { receipt } = await this.contract.release(address, { gasPrice: 0 });
-        const profit = (await balance.current(address)).sub(before);
-        expect(profit).to.be.bignumber.equal(amount.mul(shares).div(this.totalShares));
+      for (const payee of [ payee1, payee2, payee3 ]) {
+        const before = await balance.current(payee);
+        const shares = await this.contract.shares(payee);
+        const supply = await this.contract.totalShares();
+        const profit = amount.mul(shares).div(supply);
+
+        const receipt = await this.contract.release(payee);
+        expect((await balance.current(payee)).sub(before)).to.be.bignumber.equal(profit);
         expectEvent(receipt, 'PaymentReleased', {
-          to: address,
+          to: payee,
           amount: profit,
         });
       }

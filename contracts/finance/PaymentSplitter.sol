@@ -2,50 +2,9 @@
 
 pragma solidity ^0.8.0;
 
-import "../utils/Context.sol";
 import "../utils/Address.sol";
-
-library Distributions {
-    struct AddressToUintWithTotal {
-        mapping(address => uint256) _values;
-        uint256 _total;
-    }
-
-    function getValue(AddressToUintWithTotal storage distribution, address account) internal view returns (uint256) {
-        return distribution._values[account];
-    }
-
-    function getTotal(AddressToUintWithTotal storage distribution) internal view returns (uint256) {
-        return distribution._total;
-    }
-
-    function increaseValue(
-        AddressToUintWithTotal storage distribution,
-        address account,
-        uint256 value
-    ) internal {
-        distribution._total += value;
-        distribution._values[account] += value;
-    }
-
-    function decreaseValue(
-        AddressToUintWithTotal storage distribution,
-        address account,
-        uint256 value
-    ) internal {
-        distribution._total -= value;
-        distribution._values[account] -= value;
-    }
-
-    function setValue(
-        AddressToUintWithTotal storage distribution,
-        address account,
-        uint256 value
-    ) internal {
-        distribution._total = getTotal(distribution) - getValue(distribution, account) + value;
-        distribution._values[account] = value;
-    }
-}
+import "../utils/Context.sol";
+import "../utils/math/SafeMath.sol";
 
 /**
  * @title PaymentSplitter
@@ -61,16 +20,16 @@ library Distributions {
  * function.
  */
 contract PaymentSplitter is Context {
-    using Distributions for Distributions.AddressToUintWithTotal;
-
-    // solhint-disable-next-line var-name-mixedcase, private-vars-leading-underscore
-    Distributions.AddressToUintWithTotal private $shares;
-    // solhint-disable-next-line var-name-mixedcase, private-vars-leading-underscore
-    Distributions.AddressToUintWithTotal private $released;
-
     event PayeeAdded(address account, uint256 shares);
     event PaymentReleased(address to, uint256 amount);
     event PaymentReceived(address from, uint256 amount);
+
+    uint256 private _totalShares;
+    uint256 private _totalReleased;
+
+    mapping(address => uint256) private _shares;
+    mapping(address => uint256) private _released;
+    address[] private _payees;
 
     /**
      * @dev Creates an instance of `PaymentSplitter` where each account in `payees` is assigned the number of shares at
@@ -79,12 +38,12 @@ contract PaymentSplitter is Context {
      * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
      * duplicates in `payees`.
      */
-    constructor(address[] memory _payees, uint256[] memory _shares) payable {
-        require(_payees.length == _shares.length, "PaymentSplitter: payees and shares length mismatch");
-        require(_payees.length > 0, "PaymentSplitter: no payees");
+    constructor(address[] memory payees, uint256[] memory shares_) payable {
+        require(payees.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
+        require(payees.length > 0, "PaymentSplitter: no payees");
 
-        for (uint256 i = 0; i < _payees.length; ++i) {
-            _setShares(_payees[i], _shares[i]);
+        for (uint256 i = 0; i < payees.length; i++) {
+            _addPayee(payees[i], shares_[i]);
         }
     }
 
@@ -102,31 +61,38 @@ contract PaymentSplitter is Context {
     }
 
     /**
-     * @dev Getter for the amount of shares held by an account.
-     */
-    function shares(address account) public view returns (uint256) {
-        return $shares.getValue(account);
-    }
-
-    /**
      * @dev Getter for the total shares held by payees.
      */
     function totalShares() public view returns (uint256) {
-        return $shares.getTotal();
-    }
-
-    /**
-     * @dev Getter for the amount of Ether already released to a payee.
-     */
-    function released(address account) public view returns (uint256) {
-        return $released.getValue(account);
+        return _totalShares;
     }
 
     /**
      * @dev Getter for the total amount of Ether already released.
      */
     function totalReleased() public view returns (uint256) {
-        return $released.getTotal();
+        return _totalReleased;
+    }
+
+    /**
+     * @dev Getter for the amount of shares held by an account.
+     */
+    function shares(address account) public view returns (uint256) {
+        return _shares[account];
+    }
+
+    /**
+     * @dev Getter for the amount of Ether already released to a payee.
+     */
+    function released(address account) public view returns (uint256) {
+        return _released[account];
+    }
+
+    /**
+     * @dev Getter for the address of the payee number `index`.
+     */
+    function payee(uint256 index) public view returns (address) {
+        return _payees[index];
     }
 
     /**
@@ -134,54 +100,33 @@ contract PaymentSplitter is Context {
      * total shares and their previous withdrawals.
      */
     function release(address payable account) public virtual {
-        uint256 totalReceived = _currentBalance() + totalReleased();
-        uint256 personalValue = (totalReceived * shares(account)) / totalShares();
-        uint256 pendingValue = personalValue - released(account);
+        require(_shares[account] > 0, "PaymentSplitter: account has no shares");
 
-        if (pendingValue > 0) {
-            $released.increaseValue(account, pendingValue);
+        uint256 totalReceived = address(this).balance + _totalReleased;
+        uint256 payment = (totalReceived * _shares[account]) / _totalShares - _released[account];
 
-            _processPayment(account, pendingValue);
-            emit PaymentReleased(account, pendingValue);
-        }
+        require(payment != 0, "PaymentSplitter: account is not due payment");
+
+        _released[account] = _released[account] + payment;
+        _totalReleased = _totalReleased + payment;
+
+        Address.sendValue(account, payment);
+        emit PaymentReleased(account, payment);
     }
 
     /**
      * @dev Add a new payee to the contract.
      * @param account The address of the payee to add.
-     * @param newShares The number of shares owned by the payee.
+     * @param shares_ The number of shares owned by the payee.
      */
-    function _updateShares(address account, uint256 newShares) internal virtual {
-        uint256 totalReceived = _currentBalance() + totalReleased();
-        if (totalReceived > 0) {
-            uint256 oldShares = shares(account);
-            if (oldShares < newShares) {
-                uint256 delta = (totalReceived * (newShares - oldShares)) / totalShares();
-                $released.increaseValue(account, delta);
-            } else {
-                uint256 delta = (totalReceived * (oldShares - newShares)) / totalShares();
-                $released.decreaseValue(account, delta);
-            }
-        }
-        _setShares(account, newShares);
-    }
+    function _addPayee(address account, uint256 shares_) private {
+        require(account != address(0), "PaymentSplitter: account is the zero address");
+        require(shares_ > 0, "PaymentSplitter: shares are 0");
+        require(_shares[account] == 0, "PaymentSplitter: account already has shares");
 
-    function _setShares(address account, uint256 shares) private {
-        $shares.setValue(account, shares);
-        emit PayeeAdded(account, shares);
-    }
-
-    /**
-     * @dev abstract virtual function: returns the current balance of the PaymentSplitter
-     */
-    function _currentBalance() internal view virtual returns (uint256) {
-        return address(this).balance;
-    }
-
-    /**
-     * @dev abstract virtual function: send value/assets
-     */
-    function _processPayment(address payable account, uint256 payment) internal virtual {
-        Address.sendValue(account, payment);
+        _payees.push(account);
+        _shares[account] = shares_;
+        _totalShares = _totalShares + shares_;
+        emit PayeeAdded(account, shares_);
     }
 }
