@@ -5,6 +5,120 @@ pragma solidity ^0.8.5;
 import "./AssetManager.sol";
 import "./SharesManager/ISharesManager.sol";
 
+library Distribution {
+    struct AddressToUintWithTotal {
+        mapping(address => uint256) _values;
+        uint256 _total;
+    }
+
+    function getValue(AddressToUintWithTotal storage store, address account) internal view returns (uint256) {
+        return store._values[account];
+    }
+
+    function getTotal(AddressToUintWithTotal storage store) internal view returns (uint256) {
+        return store._total;
+    }
+
+    function setValue(AddressToUintWithTotal storage store, address account, uint256 value) internal {
+        store._total = store._total - store._values[account] + value;
+        store._values[account] = value;
+    }
+
+    function incrValue(AddressToUintWithTotal storage store, address account, uint256 value) internal {
+        store._total += value;
+        store._values[account] += value;
+    }
+
+    function decrValue(AddressToUintWithTotal storage store, address account, uint256 value) internal {
+        store._total -= value;
+        store._values[account] -= value;
+    }
+}
+
+
+
+library PaymentSplitting {
+    using AssetManager for AssetManager.Asset;
+    using Distribution for Distribution.AddressToUintWithTotal;
+
+    struct Manifest {
+        AssetManager.Asset _asset;
+        Distribution.AddressToUintWithTotal _released;
+    }
+
+    event PaymentReleased(address to, uint256 amount);
+
+    function init(Manifest storage store, AssetManager.Asset memory asset) internal {
+        store._asset = asset;
+    }
+
+    function released(Manifest storage store, address account) internal view returns (uint256) {
+        return store._released.getValue(account);
+    }
+
+    function totalReleased(Manifest storage store) internal view returns (uint256) {
+        return store._released.getTotal();
+    }
+
+    function pendingRelease(
+        Manifest storage store,
+        address account,
+        uint256 shares,
+        uint256 totalShares
+    ) internal view returns (uint256) {
+        uint256 totalReceived = AssetManager.getBalance(store._asset, address(this)) + store._released.getTotal();
+        uint256 personalValue = (totalReceived * shares) / totalShares;
+        return personalValue - store._released.getValue(account);
+    }
+
+    function release(
+        Manifest storage store,
+        address account,
+        uint256 shares,
+        uint256 totalShares
+    ) internal returns (uint256) {
+        uint256 toRelease = pendingRelease(store, account, shares, totalShares);
+        if (toRelease > 0) {
+            store._released.incrValue(account, toRelease);
+            emit PaymentReleased(account, toRelease);
+            store._asset.sendValue(account, toRelease);
+        }
+        return toRelease;
+    }
+
+    function rebalance(
+        Manifest storage store,
+        address account,
+        uint256 oldShares,
+        uint256 newShares,
+        uint256 oldTotalShares
+    ) internal {
+        uint256 totalReceived = AssetManager.getBalance(store._asset, address(this)) + totalReleased(store);
+        if (oldTotalShares > 0 && totalReceived > 0) {
+            if (oldShares < newShares) {
+                store._released.incrValue(account, (totalReceived * (newShares - oldShares)) / oldTotalShares);
+            } else {
+                store._released.decrValue(account, (totalReceived * (oldShares - newShares)) / oldTotalShares);
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @title ModularPaymentSplitter
  * @dev This contract allows to split payments in any fungible asset (supported by the AssetManager library) among a
@@ -20,48 +134,39 @@ import "./SharesManager/ISharesManager.sol";
  * {release} function.
  */
 abstract contract ModularPaymentSplitter is ISharesManager {
-    using AssetManager for AssetManager.Asset;
+    using PaymentSplitting for PaymentSplitting.Manifest;
 
-    // Asset handling functors, support ETH, ERC20 & ERC1155
-    AssetManager.Asset private _asset;
+    PaymentSplitting.Manifest private _manifest;
 
-    // Release manifest
-    mapping(address => uint256) private _released;
-    uint256 private _totalReleased;
-
-    /**
-     * @dev Emitted when `amount` units are released to `to`.
-     */
+    // From PaymentSplittingdress to, uint256  make part of the AB);
     event PaymentReleased(address to, uint256 amount);
 
     /**
      * @dev Initialize with an asset handling object.
      */
     constructor(AssetManager.Asset memory asset) {
-        _asset = asset;
+        _manifest.init(asset);
     }
 
     /**
      * @dev Getter for the amount of Ether already released to a payee.
      */
     function released(address account) public view returns (uint256) {
-        return _released[account];
+        return _manifest.released(account);
     }
 
     /**
      * @dev Getter for the total amount of Ether already released.
      */
     function totalReleased() public view returns (uint256) {
-        return _totalReleased;
+        return _manifest.totalReleased();
     }
 
     /**
-     *
+     * @dev Asset units up for release.
      */
     function pendingRelease(address account) public view virtual returns (uint256) {
-        uint256 totalReceived = _asset.getBalance(address(this)) + totalReleased();
-        uint256 personalValue = (totalReceived * _shares(account)) / _totalShares();
-        return personalValue - released(account);
+        return _manifest.pendingRelease(account, _shares(account), _totalShares());
     }
 
     /**
@@ -69,14 +174,7 @@ abstract contract ModularPaymentSplitter is ISharesManager {
      * previous withdrawals.
      */
     function release(address account) public virtual {
-        uint256 toRelease = pendingRelease(account);
-        if (toRelease > 0) {
-            _released[account] += toRelease;
-            _totalReleased += toRelease;
-
-            _asset.sendValue(account, toRelease);
-            emit PaymentReleased(account, toRelease);
-        }
+        _manifest.release(account, _shares(account), _totalShares());
     }
 
     /**
@@ -92,18 +190,6 @@ abstract contract ModularPaymentSplitter is ISharesManager {
         uint256 newTotalShares
     ) internal virtual override {
         super._sharesChanged(account, oldShares, newShares, oldTotalShares, newTotalShares);
-
-        uint256 totalReceived = _asset.getBalance(address(this)) + totalReleased();
-        if (oldTotalShares > 0 && totalReceived > 0) {
-            if (oldShares < newShares) {
-                uint256 delta = (totalReceived * (newShares - oldShares)) / oldTotalShares;
-                _released[account] += delta;
-                _totalReleased += delta;
-            } else {
-                uint256 delta = (totalReceived * (oldShares - newShares)) / oldTotalShares;
-                _released[account] -= delta;
-                _totalReleased -= delta;
-            }
-        }
+        _manifest.rebalance(account, oldShares, newShares, oldTotalShares);
     }
 }
