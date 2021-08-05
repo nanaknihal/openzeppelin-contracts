@@ -3,11 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "../finance/ModularPaymentSplitter.sol";
-import "../finance/AssetHolder/TokenHolder.sol";
 import "../finance/SharesManager/ERC20Shares.sol";
 
-contract TokenSplitterMock is ModularPaymentSplitter, TokenHolder, ERC20Shares {
-    constructor(IERC20 _token) ERC20("PaymentSplitterShare", "shares") TokenHolder(_token) {}
+contract TokenSplitterMock is ModularPaymentSplitter, ERC20Shares {
+    constructor(IERC20 _token)
+        ERC20("PaymentSplitterShare", "shares")
+        ModularPaymentSplitter(AssetManager.ERC20(_token))
+    {}
 
     function mint(address payees, uint256 shares) external {
         _mint(payees, shares);

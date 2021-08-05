@@ -30,7 +30,7 @@ const withOptimizations = argv.enableGasReport || argv.compileMode === 'producti
  */
 module.exports = {
   solidity: {
-    version: '0.8.3',
+    version: '0.8.6',
     settings: {
       optimizer: {
         enabled: withOptimizations,

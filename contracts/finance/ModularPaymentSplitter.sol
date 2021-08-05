@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "./AssetHolder/IAssetHolder.sol";
+import "./AssetManager.sol";
 import "./SharesManager/ISharesManager.sol";
 
 /**
@@ -18,11 +18,19 @@ import "./SharesManager/ISharesManager.sol";
  * accounts but kept in this contract, and the actual transfer is triggered as a separate step by calling the {release}
  * function.
  */
-abstract contract ModularPaymentSplitter is IAssetHolder, ISharesManager {
-    mapping(address => uint256) _released;
-    uint256 _totalReleased;
+abstract contract ModularPaymentSplitter is ISharesManager {
+    using AssetManager for AssetManager.Asset;
+
+    AssetManager.Asset private _asset;
+
+    mapping(address => uint256) private _released;
+    uint256 private _totalReleased;
 
     event PaymentReleased(address to, uint256 amount);
+
+    constructor(AssetManager.Asset memory asset) {
+        _asset = asset;
+    }
 
     /**
      * @dev Getter for the amount of Ether already released to a payee.
@@ -43,7 +51,7 @@ abstract contract ModularPaymentSplitter is IAssetHolder, ISharesManager {
      * total shares and their previous withdrawals.
      */
     function pendingRelease(address account) public view virtual returns (uint256) {
-        uint256 totalReceived = _currentBalance() + totalReleased();
+        uint256 totalReceived = _asset.getBalance(address(this)) + totalReleased();
         uint256 personalValue = (totalReceived * _shares(account)) / _totalShares();
         return personalValue - released(account);
     }
@@ -54,7 +62,7 @@ abstract contract ModularPaymentSplitter is IAssetHolder, ISharesManager {
             _released[account] += toRelease;
             _totalReleased += toRelease;
 
-            _processPayment(account, toRelease);
+            _asset.sendValue(account, toRelease);
             emit PaymentReleased(account, toRelease);
         }
     }
@@ -68,7 +76,7 @@ abstract contract ModularPaymentSplitter is IAssetHolder, ISharesManager {
     ) internal virtual override {
         super._sharesChanged(account, oldShares, newShares, oldTotalShares, newTotalShares);
 
-        uint256 totalReceived = _currentBalance() + totalReleased();
+        uint256 totalReceived = _asset.getBalance(address(this)) + totalReleased();
         if (oldTotalShares > 0 && totalReceived > 0) {
             if (oldShares < newShares) {
                 uint256 delta = (totalReceived * (newShares - oldShares)) / oldTotalShares;
