@@ -163,6 +163,8 @@ abstract contract TokenizedETHSplitter is ERC20, AbstractSplitter {
     AbstractSplitter(AssetManager.ETH())
     {}
 
+    receive() external payable {}
+
     function _shares(address account) internal view virtual override returns (uint256) {
         return balanceOf(account);
     }
