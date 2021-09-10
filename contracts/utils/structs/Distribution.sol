@@ -16,22 +16,22 @@ library Distribution {
         return store._total;
     }
 
-    function incr(
+    function add(
         AddressToUintWithTotal storage store,
         address account,
         uint256 value
     ) internal {
-        store._total += value;
         store._values[account] += value;
+        store._total += value;
     }
 
-    function decr(
+    function sub(
         AddressToUintWithTotal storage store,
         address account,
         uint256 value
     ) internal {
-        store._total -= value;
         store._values[account] -= value;
+        store._total -= value;
     }
 
     function move(
@@ -57,22 +57,22 @@ library Distribution {
         return store._total;
     }
 
-    function incr(
+    function add(
         AddressToIntWithTotal storage store,
         address account,
         int256 value
     ) internal {
-        store._total += value;
         store._values[account] += value;
+        store._total += value;
     }
 
-    function decr(
+    function sub(
         AddressToIntWithTotal storage store,
         address account,
         int256 value
     ) internal {
-        store._total -= value;
         store._values[account] -= value;
+        store._total -= value;
     }
 
     function move(
