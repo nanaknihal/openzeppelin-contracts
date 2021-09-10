@@ -14,7 +14,7 @@ import "./IGovernor.sol";
 /**
  * @dev Core of the governance system, designed to be extended though various modules.
  *
- * This contract is abstract and requiers several function to be implemented in various modules:
+ * This contract is abstract and requires several function to be implemented in various modules:
  *
  * - A counting module must implement {quorum}, {_quorumReached}, {_voteSucceeded} and {_countVote}
  * - A voting module must implement {getVotes}
@@ -137,27 +137,7 @@ abstract contract Governor is Context, ERC165, EIP712, IGovernor {
     }
 
     /**
-     * @dev See {IGovernor-votingDelay}
-     */
-    function votingDelay() public view virtual override returns (uint256);
-
-    /**
-     * @dev See {IGovernor-votingPeriod}
-     */
-    function votingPeriod() public view virtual override returns (uint256);
-
-    /**
-     * @dev See {IGovernor-quorum}
-     */
-    function quorum(uint256 blockNumber) public view virtual override returns (uint256);
-
-    /**
-     * @dev See {IGovernor-getVotes}
-     */
-    function getVotes(address account, uint256 blockNumber) public view virtual override returns (uint256);
-
-    /**
-     * @dev Amount of votes already casted passes the threshold limit.
+     * @dev Amount of votes already cast passes the threshold limit.
      */
     function _quorumReached(uint256 proposalId) internal view virtual returns (bool);
 
@@ -325,7 +305,7 @@ abstract contract Governor is Context, ERC165, EIP712, IGovernor {
     }
 
     /**
-     * @dev Internal vote casting mechanism: Check that the vote is pending, that it has not been casted yet, retrieve
+     * @dev Internal vote casting mechanism: Check that the vote is pending, that it has not been cast yet, retrieve
      * voting weight using {IGovernor-getVotes} and call the {_countVote} internal function.
      *
      * Emits a {IGovernor-VoteCast} event.

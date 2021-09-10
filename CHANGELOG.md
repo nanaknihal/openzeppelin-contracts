@@ -1,10 +1,17 @@
 # Changelog
 
-## Unreleased
+## 4.3.1
+
+ * `TimelockController`: Add additional isOperationReady check.
+
+## 4.3.0 (2021-08-17)
 
  * `ERC2771Context`: use private variable from storage to store the forwarder address. Fixes issues where `_msgSender()` was not callable from constructors. ([#2754](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2754))
  * `EnumerableSet`: add `values()` functions that returns an array containing all values in a single call. ([#2768](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2768))
  * `Governor`: added a modular system of `Governor` contracts based on `GovernorAlpha` and `GovernorBravo`. ([#2672](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2672))
+ * Add an `interfaces` folder containing solidity interfaces to final ERCs. ([#2517](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2517))
+ * `ECDSA`: add `tryRecover` functions that will not throw if the signature is invalid, and will return an error flag instead. ([#2661](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2661))
+ * `SignatureChecker`: Reduce gas usage of the `isValidSignatureNow` function for the "signature by EOA" case. ([#2661](https://github.com/OpenZeppelin/openzeppelin-contracts/pull/2661))
 
 ## 4.2.0 (2021-06-30)
 
@@ -91,6 +98,14 @@ Make sure you're using git or another version control system to be able to recov
 ### How to upgrade from 4.0-beta.x
 
 Some further changes have been done between the different beta iterations. Transitions made during this period are configured in the `migrate-imports` script. Consequently, you can upgrade from any previous 4.0-beta.x version using the same script as described in the *How to upgrade from 3.x* section.
+
+## 3.4.2
+
+ * `TimelockController`: Add additional isOperationReady check.
+
+## 3.4.1 (2021-03-03)
+
+ * `ERC721`: made `_approve` an internal function (was private).
 
 ## 3.4.0 (2021-02-02)
 
