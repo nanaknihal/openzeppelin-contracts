@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.6;
 
 import "../token/ERC20/ERC20.sol";
 import "./AssetManager.sol";
@@ -63,8 +63,6 @@ library Distribution {
     }
 }
 
-
-
 /**
  * @title AbstractSplitter
  * @dev This contract allows to split payments in any fungible asset (supported by the AssetManager library) among a
@@ -99,9 +97,13 @@ abstract contract AbstractSplitter {
      * @dev Asset units up for release.
      */
     function pendingRelease(address account) public view virtual returns (uint256) {
-        int256 totalReceived = int256(_asset.getBalance(address(this))) + _released.getTotal();
-        int256 personalValue = (totalReceived * int256(_shares(account))) / int256(_totalShares());
-        return uint256(personalValue - _released.getValue(account));
+        int256 personalShares = int256(_shares(account));
+        // if personalShares == 0, there is a risk of totalShares == 0. To avoid div by 0 just return 0
+        int256 allocation = personalShares > 0
+            ? personalShares * (int256(_asset.getBalance(address(this))) + _released.getTotal()) / int256(_totalShares())
+            : int256(0);
+
+        return uint256(allocation - _released.getValue(account));
     }
 
     /**
@@ -131,10 +133,10 @@ abstract contract AbstractSplitter {
         if (amount > 0 && supply > 0) {
             uint256 virtualRelease = amount * uint256(int256(_asset.getBalance(address(this))) + _released.getTotal()) / supply;
             if (from != address(0)) {
-                _released.incrValue(from, int256(virtualRelease));
+                _released.decrValue(from, int256(virtualRelease));
             }
             if (to != address(0)) {
-                _released.decrValue(to, int256(virtualRelease));
+                _released.incrValue(to, int256(virtualRelease));
             }
         }
     }
