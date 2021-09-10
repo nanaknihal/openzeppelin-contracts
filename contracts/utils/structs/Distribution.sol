@@ -16,16 +16,7 @@ library Distribution {
         return store._total;
     }
 
-    function setValue(
-        AddressToUintWithTotal storage store,
-        address account,
-        uint256 value
-    ) internal {
-        store._total = store._total - store._values[account] + value;
-        store._values[account] = value;
-    }
-
-    function incrValue(
+    function incr(
         AddressToUintWithTotal storage store,
         address account,
         uint256 value
@@ -34,13 +25,23 @@ library Distribution {
         store._values[account] += value;
     }
 
-    function decrValue(
+    function decr(
         AddressToUintWithTotal storage store,
         address account,
         uint256 value
     ) internal {
         store._total -= value;
         store._values[account] -= value;
+    }
+
+    function move(
+        AddressToUintWithTotal storage store,
+        address from,
+        address to,
+        uint256 value
+    ) internal {
+        store._values[from] -= value;
+        store._values[to] += value;
     }
 
     struct AddressToIntWithTotal {
@@ -56,16 +57,7 @@ library Distribution {
         return store._total;
     }
 
-    function setValue(
-        AddressToIntWithTotal storage store,
-        address account,
-        int256 value
-    ) internal {
-        store._total = store._total - store._values[account] + value;
-        store._values[account] = value;
-    }
-
-    function incrValue(
+    function incr(
         AddressToIntWithTotal storage store,
         address account,
         int256 value
@@ -74,12 +66,22 @@ library Distribution {
         store._values[account] += value;
     }
 
-    function decrValue(
+    function decr(
         AddressToIntWithTotal storage store,
         address account,
         int256 value
     ) internal {
         store._total -= value;
         store._values[account] -= value;
+    }
+
+    function move(
+        AddressToIntWithTotal storage store,
+        address from,
+        address to,
+        int256 value
+    ) internal {
+        store._values[from] -= value;
+        store._values[to] += value;
     }
 }

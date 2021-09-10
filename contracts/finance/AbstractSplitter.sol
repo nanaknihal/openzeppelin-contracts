@@ -67,7 +67,7 @@ abstract contract AbstractSplitter {
     function release(address account) public virtual returns (uint256) {
         uint256 toRelease = pendingRelease(account);
         if (toRelease > 0) {
-            _released.incrValue(account, SafeCast.toInt256(toRelease));
+            _released.incr(account, SafeCast.toInt256(toRelease));
             emit PaymentReleased(account, toRelease);
             _asset.sendValue(account, toRelease);
         }
@@ -87,10 +87,10 @@ abstract contract AbstractSplitter {
         if (amount > 0 && supply > 0) {
             int256 virtualRelease = SafeCast.toInt256(_allocation(amount, supply));
             if (from != address(0)) {
-                _released.decrValue(from, virtualRelease);
+                _released.decr(from, virtualRelease);
             }
             if (to != address(0)) {
-                _released.incrValue(to, virtualRelease);
+                _released.incr(to, virtualRelease);
             }
         }
     }
