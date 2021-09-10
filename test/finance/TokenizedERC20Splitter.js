@@ -86,7 +86,7 @@ contract('TokenizedERC20Splitter', function (accounts) {
       [payee1]: { shares: new BN(0), pending: new BN(0) },
       [payee2]: { shares: new BN(0), pending: new BN(0) },
       [payee3]: { shares: new BN(0), pending: new BN(0) },
-    }
+    };
     const runCheck = () => Promise.all(Object.entries(manifest).map(async ([ account, { shares, pending } ]) => {
       expect(await this.contract.balanceOf(account)).to.be.bignumber.equal(shares);
       expect(await this.contract.pendingRelease(account)).to.be.bignumber.equal(pending);
@@ -94,46 +94,46 @@ contract('TokenizedERC20Splitter', function (accounts) {
 
     await runCheck();
 
-    await this.contract.mint(payee1, '100')
-    await this.contract.mint(payee2, '100')
-    manifest[payee1].shares = manifest[payee1].shares.addn(100)
-    manifest[payee2].shares = manifest[payee2].shares.addn(100)
+    await this.contract.mint(payee1, '100');
+    await this.contract.mint(payee2, '100');
+    manifest[payee1].shares = manifest[payee1].shares.addn(100);
+    manifest[payee2].shares = manifest[payee2].shares.addn(100);
     await runCheck();
 
     await this.token.transfer(this.contract.address, '100', { from: owner });
-    manifest[payee1].pending = manifest[payee1].pending.addn(50)
-    manifest[payee2].pending = manifest[payee2].pending.addn(50)
+    manifest[payee1].pending = manifest[payee1].pending.addn(50);
+    manifest[payee2].pending = manifest[payee2].pending.addn(50);
     await runCheck();
 
-    await this.contract.mint(payee1, '100')
-    await this.contract.mint(payee3, '100')
-    manifest[payee1].shares = manifest[payee1].shares.addn(100)
-    manifest[payee3].shares = manifest[payee3].shares.addn(100)
-    await runCheck();
-
-    await this.token.transfer(this.contract.address, '100', { from: owner });
-    manifest[payee1].pending = manifest[payee1].pending.addn(50)
-    manifest[payee2].pending = manifest[payee2].pending.addn(25)
-    manifest[payee3].pending = manifest[payee3].pending.addn(25)
-    await runCheck();
-
-    await this.contract.burn(payee1, '200')
-    manifest[payee1].shares = manifest[payee1].shares.subn(200)
+    await this.contract.mint(payee1, '100');
+    await this.contract.mint(payee3, '100');
+    manifest[payee1].shares = manifest[payee1].shares.addn(100);
+    manifest[payee3].shares = manifest[payee3].shares.addn(100);
     await runCheck();
 
     await this.token.transfer(this.contract.address, '100', { from: owner });
-    manifest[payee2].pending = manifest[payee2].pending.addn(50)
-    manifest[payee3].pending = manifest[payee3].pending.addn(50)
+    manifest[payee1].pending = manifest[payee1].pending.addn(50);
+    manifest[payee2].pending = manifest[payee2].pending.addn(25);
+    manifest[payee3].pending = manifest[payee3].pending.addn(25);
+    await runCheck();
+
+    await this.contract.burn(payee1, '200');
+    manifest[payee1].shares = manifest[payee1].shares.subn(200);
+    await runCheck();
+
+    await this.token.transfer(this.contract.address, '100', { from: owner });
+    manifest[payee2].pending = manifest[payee2].pending.addn(50);
+    manifest[payee3].pending = manifest[payee3].pending.addn(50);
     await runCheck();
 
     await this.contract.transfer(payee3, '40', { from: payee2 });
-    manifest[payee2].shares = manifest[payee2].shares.subn(40)
-    manifest[payee3].shares = manifest[payee3].shares.addn(40)
+    manifest[payee2].shares = manifest[payee2].shares.subn(40);
+    manifest[payee3].shares = manifest[payee3].shares.addn(40);
     await runCheck();
 
     await this.token.transfer(this.contract.address, '100', { from: owner });
-    manifest[payee2].pending = manifest[payee2].pending.addn(30)
-    manifest[payee3].pending = manifest[payee3].pending.addn(70)
+    manifest[payee2].pending = manifest[payee2].pending.addn(30);
+    manifest[payee3].pending = manifest[payee3].pending.addn(70);
     await runCheck();
 
     for (const [ account, { pending }] of Object.entries(manifest)) {
